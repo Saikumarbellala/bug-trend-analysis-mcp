@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bug Trend Analysis Report — KAN Project</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600;700&display=swap');
+
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1a2235;
+    --border: #1e2d45;
+    --accent: #00e5ff;
+    --accent2: #ff4d6d;
+    --accent3: #a78bfa;
+    --accent4: #34d399;
+    --accent5: #fbbf24;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --red: #ef4444;
+    --orange: #f97316;
+    --yellow: #eab308;
+    --green: #22c55e;
+    --blue: #3b82f6;
+    --purple: #a855f7;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+
+  /* Header */
+  header {
+    padding: 48px 0 32px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 40px;
+  }
+
+  .header-top {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .badge-jira { background: rgba(0,82,204,0.3); border: 1px solid #0052cc; color: #4c9aff; }
+  .badge-mcp { background: rgba(0,229,255,0.1); border: 1px solid var(--accent); color: var(--accent); }
+  .badge-live { background: rgba(52,211,153,0.1); border: 1px solid var(--accent4); color: var(--accent4); animation: pulse 2s infinite; }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+  h1 {
+    font-size: clamp(28px, 5vw, 48px);
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -1px;
+  }
+
+  h1 span { color: var(--accent); }
+
+  .header-meta {
+    display: flex;
+    gap: 32px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+  }
+
+  .meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .meta-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .meta-value { font-size: 14px; font-weight: 600; color: var(--text); }
+
+  /* KPI Cards */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 40px;
+  }
+
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px 20px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s, border-color 0.2s;
+  }
+
+  .kpi-card:hover { transform: translateY(-2px); border-color: var(--accent); }
+
+  .kpi-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+
+  .kpi-card.cyan::after { background: var(--accent); }
+  .kpi-card.red::after { background: var(--accent2); }
+  .kpi-card.purple::after { background: var(--accent3); }
+  .kpi-card.green::after { background: var(--accent4); }
+  .kpi-card.yellow::after { background: var(--accent5); }
+
+  .kpi-number {
+    font-family: 'Space Mono', monospace;
+    font-size: 40px;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+
+  .kpi-card.cyan .kpi-number { color: var(--accent); }
+  .kpi-card.red .kpi-number { color: var(--accent2); }
+  .kpi-card.purple .kpi-number { color: var(--accent3); }
+  .kpi-card.green .kpi-number { color: var(--accent4); }
+  .kpi-card.yellow .kpi-number { color: var(--accent5); }
+
+  .kpi-label { font-size: 13px; color: var(--muted); font-weight: 500; }
+
+  /* Section */
+  .section { margin-bottom: 48px; }
+
+  .section-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--accent);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* Chart grid */
+  .chart-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 20px;
+  }
+
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+  }
+
+  .chart-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .chart-wrap { position: relative; height: 260px; }
+
+  /* Root cause breakdown */
+  .root-cause-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 16px;
+  }
+
+  .rc-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    transition: border-color 0.2s;
+  }
+
+  .rc-card:hover { border-color: var(--border); }
+
+  .rc-icon {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .rc-content { flex: 1; }
+  .rc-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .rc-count { font-family: 'Space Mono', monospace; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .rc-desc { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+  .rc-bar {
+    height: 4px;
+    border-radius: 2px;
+    margin-top: 12px;
+    background: var(--border);
+    overflow: hidden;
+  }
+
+  .rc-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 1s ease;
+  }
+
+  /* Bug table */
+  .table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  table { width: 100%; border-collapse: collapse; }
+
+  thead { background: var(--surface2); }
+
+  th {
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+  }
+
+  td {
+    padding: 12px 16px;
+    font-size: 13px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .issue-key {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .tag-qa { background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3); }
+  .tag-prod { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
+  .tag-staging { background: rgba(234,179,8,0.15); color: #fde047; border: 1px solid rgba(234,179,8,0.3); }
+
+  .tag-coding { background: rgba(239,68,68,0.1); color: #f87171; }
+  .tag-testing { background: rgba(249,115,22,0.1); color: #fb923c; }
+  .tag-req { background: rgba(234,179,8,0.1); color: #fde047; }
+  .tag-design { background: rgba(34,197,94,0.1); color: #4ade80; }
+  .tag-process { background: rgba(59,130,246,0.1); color: #60a5fa; }
+  .tag-human { background: rgba(168,85,247,0.1); color: #c084fc; }
+
+  /* Recommendations */
+  .rec-list { display: flex; flex-direction: column; gap: 12px; }
+
+  .rec-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .rec-num {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    background: rgba(0,229,255,0.1);
+    border: 1px solid rgba(0,229,255,0.2);
+    border-radius: 6px;
+    padding: 4px 8px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .rec-text { font-size: 14px; line-height: 1.5; }
+  .rec-tag {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  /* Footer */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 32px 0;
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+    margin-top: 60px;
+  }
+
+  footer a { color: var(--accent); text-decoration: none; }
+
+  /* Animate in */
+  .fade-in { animation: fadeIn 0.6s ease forwards; opacity: 0; }
+  @keyframes fadeIn { to { opacity: 1; transform: translateY(0); } from { opacity: 0; transform: translateY(10px); } }
+
+  .fade-in:nth-child(1) { animation-delay: 0.1s; }
+  .fade-in:nth-child(2) { animation-delay: 0.2s; }
+  .fade-in:nth-child(3) { animation-delay: 0.3s; }
+  .fade-in:nth-child(4) { animation-delay: 0.4s; }
+  .fade-in:nth-child(5) { animation-delay: 0.5s; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <header>
+    <div class="header-top">
+      <span class="badge badge-jira">Atlassian Jira</span>
+      <span class="badge badge-mcp">MCP Connected</span>
+      <span class="badge badge-live">● Live Data</span>
+    </div>
+    <h1>Bug Trend <span>Analysis</span><br>Report</h1>
+    <div class="header-meta">
+      <div class="meta-item">
+        <span class="meta-label">Project</span>
+        <span class="meta-value">Bug Tracking (KAN)</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Analyst</span>
+        <span class="meta-value">Bellala Saikumar</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Date</span>
+        <span class="meta-value">May 25, 2026</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Instance</span>
+        <span class="meta-value">bellalasaikumar1998.atlassian.net</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">JQL Used</span>
+        <span class="meta-value" style="font-family:'Space Mono',monospace;font-size:12px">issuetype = Bug ORDER BY created ASC</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- KPIs -->
+  <div class="section">
+    <div class="section-title">Key Metrics</div>
+    <div class="kpi-grid">
+      <div class="kpi-card cyan fade-in">
+        <div class="kpi-number">25</div>
+        <div class="kpi-label">Total Bugs Analyzed</div>
+      </div>
+      <div class="kpi-card red fade-in">
+        <div class="kpi-number">9</div>
+        <div class="kpi-label">Reached Production</div>
+      </div>
+      <div class="kpi-card yellow fade-in">
+        <div class="kpi-number">5</div>
+        <div class="kpi-label">Modules Affected</div>
+      </div>
+      <div class="kpi-card purple fade-in">
+        <div class="kpi-number">6</div>
+        <div class="kpi-label">Root Cause Categories</div>
+      </div>
+      <div class="kpi-card green fade-in">
+        <div class="kpi-number">0</div>
+        <div class="kpi-label">Bugs Resolved</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="section">
+    <div class="section-title">Trend Analysis</div>
+    <div class="chart-grid">
+      <div class="chart-card">
+        <div class="chart-title">🧩 Bugs by Component</div>
+        <div class="chart-wrap"><canvas id="componentChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">📍 Bugs by Phase Found</div>
+        <div class="chart-wrap"><canvas id="phaseChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">🔍 Root Cause Distribution</div>
+        <div class="chart-wrap"><canvas id="rootCauseChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">📊 Phase vs Root Cause Matrix</div>
+        <div class="chart-wrap"><canvas id="matrixChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Root Cause Breakdown -->
+  <div class="section">
+    <div class="section-title">Root Cause Breakdown</div>
+    <div class="root-cause-grid">
+      <div class="rc-card">
+        <div class="rc-icon" style="background:rgba(239,68,68,0.1)">🔴</div>
+        <div class="rc-content">
+          <div class="rc-title">Coding Defects</div>
+          <div class="rc-count">6 bugs — 24% of total</div>
+          <div class="rc-desc">Logic errors, missing validations, wrong implementations. Most common category — developers writing incorrect code due to rushed delivery or missing code reviews.</div>
+          <div class="rc-bar"><div class="rc-bar-fill" style="width:24%;background:#ef4444"></div></div>
+        </div>
+      </div>
+      <div class="rc-card">
+        <div class="rc-icon" style="background:rgba(249,115,22,0.1)">🟠</div>
+        <div class="rc-content">
+          <div class="rc-title">Testing Gaps</div>
+          <div class="rc-count">5 bugs — 20% of total</div>
+          <div class="rc-desc">Missing test cases for edge cases, mobile viewports, large data, and long sessions. QA coverage focused only on happy-path scenarios.</div>
+          <div class="rc-bar"><div class="rc-bar-fill" style="width:20%;background:#f97316"></div></div>
+        </div>
+      </div>
+      <div class="rc-card">
+        <div class="rc-icon" style="background:rgba(234,179,8,0.1)">🟡</div>
+        <div class="rc-content">
+          <div class="rc-title">Requirement Gaps</div>
+          <div class="rc-count">4 bugs — 16% of total</div>
+          <div class="rc-desc">Features not specified — timeout handling, internationalization, file size limits. Assumptions made without stakeholder sign-off.</div>
+          <div class="rc-bar"><div class="rc-bar-fill" style="width:16%;background:#eab308"></div></div>
+        </div>
+      </div>
+      <div class="rc-card">
+        <div class="rc-icon" style="background:rgba(34,197,94,0.1)">🟢</div>
+        <div class="rc-content">
+          <div class="rc-title">Design / Architecture</div>
+          <div class="rc-count">4 bugs — 16% of total</div>
+          <div class="rc-desc">Structural decisions causing bugs at scale — no DB indexes, no circuit breaker, stateless tokens. Architecture reviews missed security and scalability.</div>
+          <div class="rc-bar"><div class="rc-bar-fill" style="width:16%;background:#22c55e"></div></div>
+        </div>
+      </div>
+      <div class="rc-card">
+        <div class="rc-icon" style="background:rgba(59,130,246,0.1)">🔵</div>
+        <div class="rc-content">
+          <div class="rc-title">Process / Tooling</div>
+          <div class="rc-count">4 bugs — 16% of total</div>
+          <div class="rc-desc">Broken workflows — CI/CD missing test gates, no backup monitoring, no release checklist. DevOps maturity gaps allowing untested code to production.</div>
+          <div class="rc-bar"><div class="rc-bar-fill" style="width:16%;background:#3b82f6"></div></div>
+        </div>
+      </div>
+      <div class="rc-card">
+        <div class="rc-icon" style="background:rgba(168,85,247,0.1)">🟣</div>
+        <div class="rc-content">
+          <div class="rc-title">Human Factors</div>
+          <div class="rc-count">4 bugs — 16% of total</div>
+          <div class="rc-desc">Developer knowledge gaps — assuming lowercase emails, unaware of regional date formats, not sanitizing error responses. Fixable via onboarding and documentation.</div>
+          <div class="rc-bar"><div class="rc-bar-fill" style="width:16%;background:#a855f7"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bug Table -->
+  <div class="section">
+    <div class="section-title">All 25 Bugs — Full List</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Issue</th>
+            <th>Summary</th>
+            <th>Component</th>
+            <th>Phase</th>
+            <th>Root Cause</th>
+          </tr>
+        </thead>
+        <tbody id="bugTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Recommendations -->
+  <div class="section">
+    <div class="section-title">Recommendations</div>
+    <div class="rec-list">
+      <div class="rec-item">
+        <span class="rec-num">IMMEDIATE</span>
+        <div>
+          <div class="rec-text">🔒 Fix KAN-14 and KAN-16 immediately — session token reuse and brute force on login are active security vulnerabilities</div>
+          <div class="rec-tag">Addresses: Coding Defects, Testing Gaps</div>
+        </div>
+      </div>
+      <div class="rec-item">
+        <span class="rec-num">SHORT-TERM</span>
+        <div>
+          <div class="rec-text">👥 Implement mandatory peer code reviews before every merge to catch logic errors, missing validations, and security oversights</div>
+          <div class="rec-tag">Addresses: Coding Defects, Human Factors</div>
+        </div>
+      </div>
+      <div class="rec-item">
+        <span class="rec-num">SHORT-TERM</span>
+        <div>
+          <div class="rec-text">🧪 Expand QA test plans to include mobile viewports, large data sets, long-session behavior, and security test cases</div>
+          <div class="rec-tag">Addresses: Testing Gaps</div>
+        </div>
+      </div>
+      <div class="rec-item">
+        <span class="rec-num">SPRINT</span>
+        <div>
+          <div class="rec-text">🚀 Add CI/CD gate: all unit + integration tests must pass before any merge to main. Block deployments on failure</div>
+          <div class="rec-tag">Addresses: Process/Tooling</div>
+        </div>
+      </div>
+      <div class="rec-item">
+        <span class="rec-num">SPRINT</span>
+        <div>
+          <div class="rec-text">📋 Create a requirement checklist template covering: i18n, timeout handling, file limits, error messages, rate limiting</div>
+          <div class="rec-tag">Addresses: Requirement Gaps</div>
+        </div>
+      </div>
+      <div class="rec-item">
+        <span class="rec-num">ROADMAP</span>
+        <div>
+          <div class="rec-text">🏗️ Conduct architecture review with security and scalability checklist — add circuit breakers, DB indexes, and token blacklisting</div>
+          <div class="rec-tag">Addresses: Design/Architecture</div>
+        </div>
+      </div>
+      <div class="rec-item">
+        <span class="rec-num">ROADMAP</span>
+        <div>
+          <div class="rec-text">🎓 Introduce developer onboarding program covering security basics, Unicode/i18n handling, and error sanitization standards</div>
+          <div class="rec-tag">Addresses: Human Factors</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p>Generated using <strong>Claude AI</strong> + <strong>Atlassian Rovo MCP</strong> | Project: <a href="https://bellalasaikumar1998.atlassian.net/jira/software/projects/KAN/boards" target="_blank">KAN @ bellalasaikumar1998.atlassian.net</a></p>
+    <p style="margin-top:8px;font-size:12px">Assignment: Bug Trend Analysis Using Atlassian MCP | May 25, 2026</p>
+  </footer>
+
+</div>
+
+<script>
+const bugs = [
+  {key:"KAN-4",summary:"Login page crashes on invalid email format",component:"Login",phase:"QA",rc:"Coding Defect"},
+  {key:"KAN-5",summary:"Dashboard data not loading for special characters",component:"Dashboard",phase:"QA",rc:"Coding Defect"},
+  {key:"KAN-6",summary:"API timeout causes blank screen with no error message",component:"API",phase:"Production",rc:"Requirement Gap"},
+  {key:"KAN-7",summary:"Reports page slow due to missing database indexes",component:"Database",phase:"Staging",rc:"Design/Architecture"},
+  {key:"KAN-8",summary:"UI buttons misaligned on small mobile screens",component:"UI",phase:"QA",rc:"Testing Gap"},
+  {key:"KAN-9",summary:"Password reset email fails for uppercase email addresses",component:"Login",phase:"Production",rc:"Human Factors"},
+  {key:"KAN-10",summary:"CI/CD pipeline missing API integration test gate",component:"API",phase:"Staging",rc:"Process/Tooling"},
+  {key:"KAN-11",summary:"Dashboard missing internationalization support",component:"Dashboard",phase:"Production",rc:"Requirement Gap"},
+  {key:"KAN-12",summary:"Duplicate records on double-click of submit button",component:"Database",phase:"QA",rc:"Coding Defect"},
+  {key:"KAN-13",summary:"Export to PDF blank pages for large reports",component:"UI",phase:"Production",rc:"Testing Gap"},
+  {key:"KAN-14",summary:"Session token valid after logout (security vulnerability)",component:"API",phase:"QA",rc:"Design/Architecture"},
+  {key:"KAN-15",summary:"Date picker wrong format for non-US regional users",component:"UI",phase:"Staging",rc:"Human Factors"},
+  {key:"KAN-16",summary:"Login endpoint has no rate limiting (brute force)",component:"Login",phase:"QA",rc:"Testing Gap"},
+  {key:"KAN-17",summary:"Database backup failure not monitored in production",component:"Database",phase:"Production",rc:"Process/Tooling"},
+  {key:"KAN-18",summary:"Dashboard chart shows incorrect totals on date filter",component:"Dashboard",phase:"QA",rc:"Coding Defect"},
+  {key:"KAN-19",summary:"File upload API has no size limit",component:"API",phase:"Staging",rc:"Requirement Gap"},
+  {key:"KAN-20",summary:"Notification badge not resetting after reading",component:"UI",phase:"Production",rc:"Coding Defect"},
+  {key:"KAN-21",summary:"Search fails for Unicode/accented characters",component:"Dashboard",phase:"QA",rc:"Human Factors"},
+  {key:"KAN-22",summary:"Cascading failure due to missing circuit breaker",component:"API",phase:"Production",rc:"Design/Architecture"},
+  {key:"KAN-23",summary:"Automated UI tests not enforced in merge process",component:"UI",phase:"QA",rc:"Process/Tooling"},
+  {key:"KAN-24",summary:"Remember me checkbox not persisting session",component:"Login",phase:"Staging",rc:"Coding Defect"},
+  {key:"KAN-25",summary:"Real-time dashboard stops updating after 30 min",component:"Dashboard",phase:"Production",rc:"Testing Gap"},
+  {key:"KAN-26",summary:"API exposes internal stack traces to end users",component:"API",phase:"QA",rc:"Human Factors"},
+  {key:"KAN-27",summary:"DB table without partitioning causes scale issues",component:"Database",phase:"Staging",rc:"Design/Architecture"},
+  {key:"KAN-28",summary:"2FA deployed without user documentation",component:"Login",phase:"Production",rc:"Process/Tooling"},
+];
+
+// Build table
+const tbody = document.getElementById('bugTableBody');
+const phaseClass = {QA:'qa',Production:'prod',Staging:'staging'};
+const rcClass = {'Coding Defect':'coding','Testing Gap':'testing','Requirement Gap':'req','Design/Architecture':'design','Process/Tooling':'process','Human Factors':'human'};
+bugs.forEach(b => {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><span class="issue-key">${b.key}</span></td>
+    <td style="max-width:320px">${b.summary}</td>
+    <td>${b.component}</td>
+    <td><span class="tag tag-${phaseClass[b.phase]}">${b.phase}</span></td>
+    <td><span class="tag tag-${rcClass[b.rc]}">${b.rc}</span></td>
+  `;
+  tbody.appendChild(tr);
+});
+
+// Chart defaults
+Chart.defaults.color = '#64748b';
+Chart.defaults.borderColor = '#1e2d45';
+Chart.defaults.font.family = 'DM Sans';
+
+// Component chart
+new Chart(document.getElementById('componentChart'), {
+  type: 'bar',
+  data: {
+    labels: ['API', 'Login', 'Dashboard', 'UI', 'Database'],
+    datasets: [{
+      data: [6, 5, 5, 5, 4],
+      backgroundColor: ['#00e5ff','#ff4d6d','#a78bfa','#34d399','#fbbf24'],
+      borderRadius: 6, borderSkipped: false,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      y: { grid: { color: '#1e2d45' }, ticks: { stepSize: 1 } },
+      x: { grid: { display: false } }
+    }
+  }
+});
+
+// Phase chart
+new Chart(document.getElementById('phaseChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ['QA (40%)', 'Production (36%)', 'Staging (24%)'],
+    datasets: [{
+      data: [10, 9, 6],
+      backgroundColor: ['#3b82f6','#ef4444','#eab308'],
+      borderWidth: 0, hoverOffset: 6,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'bottom', labels: { padding: 16, font: { size: 12 } } }
+    },
+    cutout: '65%'
+  }
+});
+
+// Root cause chart
+new Chart(document.getElementById('rootCauseChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Coding Defects', 'Testing Gaps', 'Req Gaps', 'Design/Arch', 'Process', 'Human'],
+    datasets: [{
+      data: [6, 5, 4, 4, 4, 4],
+      backgroundColor: ['#ef4444','#f97316','#eab308','#22c55e','#3b82f6','#a855f7'],
+      borderWidth: 0, hoverOffset: 6,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'bottom', labels: { padding: 12, font: { size: 11 } } }
+    },
+    cutout: '60%'
+  }
+});
+
+// Matrix chart
+new Chart(document.getElementById('matrixChart'), {
+  type: 'bar',
+  data: {
+    labels: ['Coding', 'Testing', 'Req Gap', 'Design', 'Process', 'Human'],
+    datasets: [
+      { label: 'QA', data: [4,2,0,1,2,3], backgroundColor: '#3b82f6', borderRadius: 4 },
+      { label: 'Staging', data: [1,0,2,2,1,1], backgroundColor: '#eab308', borderRadius: 4 },
+      { label: 'Production', data: [1,3,2,1,1,0], backgroundColor: '#ef4444', borderRadius: 4 },
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { position: 'bottom', labels: { padding: 16, font: { size: 12 } } } },
+    scales: {
+      x: { stacked: true, grid: { display: false } },
+      y: { stacked: true, grid: { color: '#1e2d45' }, ticks: { stepSize: 1 } }
+    }
+  }
+});
+</script>
+</body>
+</html>
